@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="NetWebRemote/NetWebRemote.Api.csproj" />
+  <Project Path="WebRemote.Core/WebRemote.Core.csproj" />
+  <Project Path="WebRemote.Rdp/WebRemote.Rdp.csproj" />
+  <Project Path="WebRemote.Sftp/WebRemote.Sftp.csproj" />
+  <Project Path="WebRemote.Ssh/WebRemote.Ssh.csproj" />
+</Solution>

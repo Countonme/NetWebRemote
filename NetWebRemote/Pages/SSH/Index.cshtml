@@ -1,0 +1,2584 @@
+﻿@page
+@model NetWebRemote.Api.Pages.SSH.IndexModel
+@{
+}
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+
+    <meta charset="UTF-8" />
+
+    <meta name="viewport"          content="width=device-width, initial-scale=1.0" />
+
+    <title>SSH Terminal</title>
+
+    <!-- xterm -->
+    <link href="~/css/xterm.css" rel="stylesheet" />
+    <link href="~/lib/css/layui.css" rel="stylesheet" />
+
+    <script src="~/js/xterm.js"></script>
+    <script src="~/js/xterm-addon-fit.js"></script>
+
+    <!-- SignalR -->
+    <script src="~/js/signalr.min.js"></script>
+    <link href="~/css/sshcmd.css?v=20260820" rel="stylesheet" />
+    <script src="~/lib/layui.js"></script>
+
+</head>
+
+
+<body>
+
+    <div class="ssh-app">
+
+
+        <!-- =========================================================
+         TOOLBAR
+     ========================================================= -->
+
+        <div class="ssh-toolbar">
+
+            <div class="ssh-logo">
+
+                <i class="layui-icon layui-icon-console"></i>
+
+                <span>SSH Terminal</span>
+
+            </div>
+
+
+            <button class="toolbar-btn primary"
+                    onclick="openAddServer()">
+
+                <i class="layui-icon layui-icon-add-1"></i>
+
+                <span>新建连接</span>
+
+            </button>
+
+
+            <button class="toolbar-btn"
+                    onclick="connectCurrentServer()">
+
+                <i class="layui-icon layui-icon-link"></i>
+
+                <span>连接</span>
+
+            </button>
+
+
+            <button class="toolbar-btn danger"
+                    onclick="disconnectCurrentServer()">
+
+                <i class="layui-icon layui-icon-close"></i>
+
+                <span>断开</span>
+
+            </button>
+
+
+            <button class="toolbar-btn"
+                    onclick="clearTerminal()">
+
+                <i class="layui-icon layui-icon-delete"></i>
+
+                <span>清屏</span>
+
+            </button>
+
+
+            <div class="toolbar-space"></div>
+
+
+            <div class="connection-status">
+
+                <span id="statusDot"
+                      class="status-dot">
+                </span>
+
+                <span id="statusText">
+                    Disconnected
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <!-- =========================================================
+         MAIN
+    ========================================================= -->
+
+        <div class="ssh-main">
+
+
+            <!-- =====================================================
+             LEFT
+        ====================================================== -->
+
+            <div class="server-sidebar">
+
+
+                <div class="server-search">
+
+                    <input type="text"
+                           id="serverSearch"
+                           class="layui-input"
+                           placeholder="搜索服务器..."
+                           oninput="filterServers()" />
+
+                </div>
+
+
+                <div class="server-add">
+
+                    <button class="layui-btn layui-btn-sm"
+                            onclick="openAddServer()">
+
+                        <i class="layui-icon layui-icon-add-1"></i>
+
+                        新建 SSH 连接
+
+                    </button>
+
+                </div>
+
+
+                <div class="server-tree"
+                     id="serverTree">
+
+
+                    <!-- 我的服务器 -->
+
+                    <div class="server-group">
+
+                        <div class="server-group-title"
+                             onclick="toggleGroup(this)">
+
+                            <i class="layui-icon layui-icon-triangle-d"></i>
+
+                            我的服务器
+
+                        </div>
+
+
+                        <div class="server-group-body"
+                             id="myServers">
+                        </div>
+
+                    </div>
+
+
+                    <!-- 最近连接 -->
+
+                    <div class="server-group">
+
+                        <div class="server-group-title"
+                             onclick="toggleGroup(this)">
+
+                            <i class="layui-icon layui-icon-triangle-d"></i>
+
+                            最近连接
+
+                        </div>
+
+
+                        <div class="server-group-body"
+                             id="recentServers">
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- =====================================================
+             RIGHT
+        ====================================================== -->
+
+            <div class="terminal-area">
+
+
+                <div class="terminal-tabs"
+                     id="terminalTabs">
+                </div>
+
+
+                <div class="terminal-container"
+                     id="terminalContainer">
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =========================================================
+         FOOTER
+    ========================================================= -->
+
+        <div class="ssh-footer">
+
+            <span class="footer-item">
+                SSH
+            </span>
+
+
+            <span class="footer-item"
+                  id="footerUser">
+                -
+            </span>
+
+
+            <span class="footer-item"
+                  id="footerAddress">
+                -
+            </span>
+
+
+            <span class="footer-item footer-online"
+                  id="footerStatus">
+                Disconnected
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <!-- =============================================================
+     CONTEXT MENU
+============================================================= -->
+
+    <div id="sshContextMenu"
+         class="ssh-context-menu">
+
+        <div class="context-item"
+             onclick="contextConnect()">
+
+            <i class="layui-icon layui-icon-link"></i>
+
+            连接
+
+        </div>
+
+
+        <div class="context-item"
+             onclick="contextNewTerminal()">
+
+            <i class="layui-icon layui-icon-console"></i>
+
+            新建 Terminal
+
+        </div>
+
+
+        <div class="context-line"></div>
+
+
+        <div class="context-item"
+             onclick="contextEdit()">
+
+            <i class="layui-icon layui-icon-edit"></i>
+
+            编辑连接
+
+        </div>
+
+
+        <div class="context-item"
+             onclick="contextCopyIp()">
+
+            <i class="layui-icon layui-icon-file"></i>
+
+            复制 IP
+
+        </div>
+
+
+        <div class="context-line"></div>
+
+
+        <div class="context-item"
+             onclick="contextDelete()">
+
+            <i class="layui-icon layui-icon-delete"></i>
+
+            删除连接
+
+        </div>
+
+    </div>
+
+
+    <script>
+
+
+            /* =============================================================
+               Layui
+            ============================================================= */
+
+            layui.use(
+                ['layer', 'form'],
+                function () {
+
+                    window.layer = layui.layer;
+
+                    window.form = layui.form;
+
+                });
+
+
+            /* =============================================================
+               GLOBAL
+            ============================================================= */
+
+            let servers = [];
+
+            let currentServerId = null;
+
+            let sessions = {};
+
+            let activeSessionId = null;
+
+            let contextServerId = null;
+
+
+            /* =============================================================
+               INIT
+            ============================================================= */
+
+            document.addEventListener(
+                "DOMContentLoaded",
+                function () {
+
+                    loadServers();
+
+                    renderServers();
+
+                    document.addEventListener(
+                        "click",
+                        function () {
+
+                            hideContextMenu();
+
+                        });
+
+                });
+
+
+            /* =============================================================
+               LOAD SERVERS
+            ============================================================= */
+
+            function loadServers() {
+
+                const data =
+                    localStorage.getItem(
+                        "ssh_servers");
+
+
+                if (data) {
+
+                    try {
+
+                        servers =
+                            JSON.parse(data);
+
+                    }
+                    catch {
+
+                        servers = [];
+
+                    }
+
+                }
+
+
+                if (!Array.isArray(servers)) {
+
+                    servers = [];
+
+                }
+
+
+                /*
+                 * 默认服务器
+                 */
+
+                if (servers.length === 0) {
+
+                    servers = [
+
+                        {
+                            id: "server_1",
+
+                            name: "Linux Server",
+
+                            host: "192.168.1.100",
+
+                            port: 22,
+
+                            username: "root",
+
+                            password: "",
+
+                            group: "我的服务器"
+
+                        }
+
+                    ];
+
+                }
+
+            }
+
+
+            /* =============================================================
+               SAVE
+            ============================================================= */
+
+            function saveServers() {
+
+                localStorage.setItem(
+                    "ssh_servers",
+                    JSON.stringify(servers));
+
+            }
+
+
+            /* =============================================================
+               RENDER
+            ============================================================= */
+
+            function renderServers() {
+
+                const container =
+                    document.getElementById(
+                        "myServers");
+
+
+                container.innerHTML = "";
+
+
+                servers.forEach(
+                    function (server) {
+
+                        const item =
+                            document.createElement(
+                                "div");
+
+
+                        item.className =
+                            "server-item";
+
+
+                        item.dataset.id =
+                            server.id;
+
+
+                        item.innerHTML = `
+
+                            <div class="server-icon">
+
+                                <i class="layui-icon layui-icon-console"></i>
+
+                            </div>
+
+
+                            <div class="server-info">
+
+                                <div class="server-name">
+
+                                    ${escapeHtml(server.name)}
+
+                                </div>
+
+
+                                <div class="server-address">
+
+                                    ${escapeHtml(server.host)}:${server.port}
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="server-status"
+                                 id="serverStatus_${server.id}">
+                            </div>
+
+                        `;
+
+
+                        item.onclick =
+                            function () {
+
+                                selectServer(
+                                    server.id);
+
+                            };
+
+
+                        item.ondblclick =
+                            function () {
+
+                                selectServer(
+                                    server.id);
+
+                                connectCurrentServer();
+
+                            };
+
+
+                        /*
+                         * 右键
+                         */
+
+                        item.oncontextmenu =
+                            function (event) {
+
+                                event.preventDefault();
+
+                                contextServerId =
+                                    server.id;
+
+                                selectServer(
+                                    server.id);
+
+                                showContextMenu(
+                                    event.clientX,
+                                    event.clientY);
+
+                            };
+
+
+                        container.appendChild(
+                            item);
+
+                    });
+
+            }
+
+
+            /* =============================================================
+               SELECT SERVER
+            ============================================================= */
+
+            function selectServer(id) {
+
+                currentServerId = id;
+
+
+                document
+                    .querySelectorAll(
+                        ".server-item")
+                    .forEach(
+                        function (item) {
+
+                            item.classList.remove(
+                                "active");
+
+                        });
+
+
+                const item =
+                    document.querySelector(
+                        `.server-item[data-id="${id}"]`);
+
+
+                if (item) {
+
+                    item.classList.add(
+                        "active");
+
+                }
+
+
+                const server =
+                    servers.find(
+                        x => x.id === id);
+
+
+                if (!server)
+                    return;
+
+
+                document.getElementById(
+                    "footerUser")
+                    .innerText =
+                    server.username;
+
+
+                document.getElementById(
+                    "footerAddress")
+                    .innerText =
+                    `${server.host}:${server.port}`;
+
+            }
+
+
+            /* =============================================================
+               ADD SERVER
+            ============================================================= */
+
+            function openAddServer() {
+
+                openServerEditor(
+                    null);
+
+            }
+
+
+            /* =============================================================
+               EDIT SERVER
+            ============================================================= */
+
+            function openEditServer(id) {
+
+                const server =
+                    servers.find(
+                        x => x.id === id);
+
+
+                if (!server)
+                    return;
+
+
+                openServerEditor(
+                    server);
+
+            }
+
+
+            /* =============================================================
+               SERVER EDITOR
+            ============================================================= */
+
+            function openServerEditor(server) {
+
+                const isEdit =
+                    !!server;
+
+
+                const html = `
+
+                    <div class="ssh-form">
+
+                        <div class="layui-form layui-form-pane">
+
+
+                            <div class="layui-form-item">
+
+                                <label class="layui-form-label">
+                                    名称
+                                </label>
+
+                                <div class="layui-input-block">
+
+                                    <input
+                                        id="sshName"
+                                        class="layui-input"
+                                        value="${isEdit ? escapeAttr(server.name) : ''}"
+                                        placeholder="例如：生产服务器">
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="layui-form-item">
+
+                                <label class="layui-form-label">
+                                    Host
+                                </label>
+
+                                <div class="layui-input-block">
+
+                                    <input
+                                        id="sshHost"
+                                        class="layui-input"
+                                        value="${isEdit ? escapeAttr(server.host) : ''}"
+                                        placeholder="192.168.1.100">
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="layui-form-item">
+
+                                <label class="layui-form-label">
+                                    Port
+                                </label>
+
+                                <div class="layui-input-block">
+
+                                    <input
+                                        id="sshPort"
+                                        class="layui-input"
+                                        type="number"
+                                        min="1"
+                                        max="65535"
+                                        value="${isEdit ? server.port : 22}">
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="layui-form-item">
+
+                                <label class="layui-form-label">
+                                    用户名
+                                </label>
+
+                                <div class="layui-input-block">
+
+                                    <input
+                                        id="sshUsername"
+                                        class="layui-input"
+                                        value="${isEdit ? escapeAttr(server.username) : 'root'}">
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="layui-form-item">
+
+                                <label class="layui-form-label">
+                                    密码
+                                </label>
+
+                                <div class="layui-input-block">
+
+                                    <input
+                                        id="sshPassword"
+                                        type="password"
+                                        class="layui-input"
+                                        value="${isEdit ? escapeAttr(server.password || '') : ''}"
+                                        placeholder="SSH Password">
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                `;
+
+
+                layer.open({
+
+                    type: 1,
+
+                    title:
+                        isEdit
+                            ? "编辑 SSH 连接"
+                            : "新建 SSH 连接",
+
+                    area: [
+                        "500px",
+                        "460px"
+                    ],
+
+                    shade: 0.35,
+
+                    skin: "ssh-layer",
+
+                    content: html,
+
+                    btn: [
+                        "保存",
+                        "取消"
+                    ],
+
+                    yes:
+                        function (index) {
+
+                            const name =
+                                document
+                                    .getElementById(
+                                        "sshName")
+                                    .value
+                                    .trim();
+
+
+                            const host =
+                                document
+                                    .getElementById(
+                                        "sshHost")
+                                    .value
+                                    .trim();
+
+
+                            const port =
+                                parseInt(
+                                    document
+                                        .getElementById(
+                                            "sshPort")
+                                        .value);
+
+
+                            const username =
+                                document
+                                    .getElementById(
+                                        "sshUsername")
+                                    .value
+                                    .trim();
+
+
+                            const password =
+                                document
+                                    .getElementById(
+                                        "sshPassword")
+                                    .value;
+
+
+                            if (!name ||
+                                !host ||
+                                !username) {
+
+                                layer.msg(
+                                    "请填写完整连接信息");
+
+                                return;
+
+                            }
+
+
+                            if (!port ||
+                                port < 1 ||
+                                port > 65535) {
+
+                                layer.msg(
+                                    "Port 必须在 1 ~ 65535");
+
+                                return;
+
+                            }
+
+
+                            if (isEdit) {
+
+                                server.name =
+                                    name;
+
+                                server.host =
+                                    host;
+
+                                server.port =
+                                    port;
+
+                                server.username =
+                                    username;
+
+                                server.password =
+                                    password;
+
+                            }
+                            else {
+
+                                const newServer = {
+
+                                    id:
+                                        "server_" +
+                                        Date.now(),
+
+                                    name:
+                                        name,
+
+                                    host:
+                                        host,
+
+                                    port:
+                                        port,
+
+                                    username:
+                                        username,
+
+                                    password:
+                                        password,
+
+                                    group:
+                                        "我的服务器"
+
+                                };
+
+
+                                servers.push(
+                                    newServer);
+
+
+                                currentServerId =
+                                    newServer.id;
+
+                            }
+
+
+                            saveServers();
+
+                            renderServers();
+
+                            selectServer(
+                                currentServerId);
+
+
+                            layer.close(
+                                index);
+
+                        }
+
+                });
+
+            }
+
+
+            /* =============================================================
+               CONNECT
+            ============================================================= */
+
+            async function connectCurrentServer() {
+
+                if (!currentServerId) {
+
+                    layer.msg(
+                        "请先选择服务器");
+
+                    return;
+
+                }
+
+
+                const server =
+                    servers.find(
+                        x => x.id === currentServerId);
+
+
+                if (!server)
+                    return;
+
+
+                /*
+                 * 已经存在 Session
+                 */
+
+                const existing =
+                    Object.values(
+                        sessions)
+                        .find(
+                            x =>
+                                x.serverId ===
+                                server.id);
+
+
+                if (existing) {
+
+                    activateSession(
+                        existing.id);
+
+                    if (!existing.connected) {
+
+                        reconnectSession(
+                            existing);
+
+                    }
+
+                    return;
+
+                }
+
+
+                createSession(
+                    server);
+
+            }
+
+
+            /* =============================================================
+               CREATE SESSION
+            ============================================================= */
+
+            function createSession(server) {
+
+                const sessionId =
+                    "session_" +
+                    Date.now();
+
+
+                const terminalElement =
+                    document.createElement(
+                        "div");
+
+
+                terminalElement.id =
+                    "terminal_" +
+                    sessionId;
+
+
+                terminalElement.className =
+                    "terminal-instance";
+
+
+                document
+                    .getElementById(
+                        "terminalContainer")
+                    .appendChild(
+                        terminalElement);
+
+
+                /*
+                 * XTERM
+                 */
+
+                const terminal =
+                    new Terminal({
+
+                        cursorBlink:
+                            true,
+
+                        fontSize:
+                            14,
+
+                        fontFamily:
+                            "Consolas, 'Courier New', monospace",
+
+                        scrollback:
+                            10000,
+
+                        convertEol:
+                            true,
+
+                        allowProposedApi:
+                            true,
+
+                        theme: {
+
+                            background:
+                                "#030608",
+
+                            foreground:
+                                "#d7e3ec",
+
+                            cursor:
+                                "#4dd7ff",
+
+                            cursorAccent:
+                                "#030608",
+
+                            selectionBackground:
+                                "#29485d",
+
+                            black:
+                                "#000000",
+
+                            red:
+                                "#ff6b6b",
+
+                            green:
+                                "#46d98a",
+
+                            yellow:
+                                "#ffd166",
+
+                            blue:
+                                "#4da3ff",
+
+                            magenta:
+                                "#c792ea",
+
+                            cyan:
+                                "#4dd7ff",
+
+                            white:
+                                "#d7e3ec"
+
+                        }
+
+                    });
+
+
+                const fitAddon =
+                    new FitAddon.FitAddon();
+
+
+                terminal.loadAddon(
+                    fitAddon);
+
+
+                terminal.open(
+                    terminalElement);
+
+
+                /*
+                 * SignalR
+                 */
+
+                const connection =
+                    new signalR.HubConnectionBuilder()
+
+                        .withUrl(
+                            "/sshTerminal")
+
+                        .withAutomaticReconnect(
+                            [0, 1000, 3000, 5000, 10000])
+
+                        .configureLogging(
+                            signalR.LogLevel.Information)
+
+                        .build();
+
+
+                const session = {
+
+                    id:
+                        sessionId,
+
+                    serverId:
+                        server.id,
+
+                    server:
+                        server,
+
+                    terminal:
+                        terminal,
+
+                    fitAddon:
+                        fitAddon,
+
+                    connection:
+                        connection,
+
+                    connected:
+                        false,
+
+                    connecting:
+                        false
+
+                };
+
+
+                sessions[sessionId] =
+                    session;
+
+
+                /*
+                 * TERMINAL INPUT
+                 */
+
+                terminal.onData(
+                    async function (data) {
+
+                        const current =
+                            sessions[sessionId];
+
+
+                        if (!current)
+                            return;
+
+
+                        if (!current.connected)
+                            return;
+
+
+                        try {
+
+                            await current.connection.invoke(
+                                "SendInput",
+                                data);
+
+                        }
+                        catch (error) {
+
+                            console.error(
+                                error);
+
+                        }
+
+                    });
+
+
+                /*
+                 * SIGNALR CONNECTED
+                 */
+
+                connection.on(
+                    "Connected",
+                    function () {
+
+                        session.connected =
+                            true;
+
+                        session.connecting =
+                            false;
+
+
+                        terminal.write(
+                            "\r\n\x1b[32mSSH Connected\x1b[0m\r\n");
+
+
+                        setServerOnline(
+                            server.id,
+                            true);
+
+
+                        addRecentServer(
+                            server.id);
+
+
+                        if (activeSessionId ===
+                            sessionId) {
+
+                            updateGlobalStatus(
+                                true,
+                                "Connected");
+
+                        }
+
+
+                        terminal.focus();
+
+                    });
+
+
+                /*
+                 * RECEIVE
+                 */
+
+                connection.on(
+                    "Receive",
+                    function (data) {
+
+                        if (!data)
+                            return;
+
+
+                        terminal.write(
+                            data);
+
+                    });
+
+
+                /*
+                 * ERROR
+                 */
+
+                connection.on(
+                    "Error",
+                    function (message) {
+
+                        session.connected =
+                            false;
+
+                        session.connecting =
+                            false;
+
+
+                        terminal.write(
+                            "\r\n\x1b[31mERROR: ");
+
+
+                        terminal.write(
+                            String(message));
+
+
+                        terminal.write(
+                            "\x1b[0m\r\n");
+
+
+                        setServerOnline(
+                            server.id,
+                            false);
+
+
+                        if (activeSessionId ===
+                            sessionId) {
+
+                            updateGlobalStatus(
+                                false,
+                                "Error");
+
+                        }
+
+                    });
+
+
+                /*
+                 * RECONNECTING
+                 */
+
+                connection.onreconnecting(
+                    function () {
+
+                        session.connected =
+                            false;
+
+
+                        if (activeSessionId ===
+                            sessionId) {
+
+                            updateGlobalStatus(
+                                false,
+                                "Reconnecting...");
+
+                        }
+
+
+                        terminal.write(
+                            "\r\n\x1b[33mSignalR reconnecting...\x1b[0m\r\n");
+
+                    });
+
+
+                /*
+                 * RECONNECTED
+                 */
+
+                connection.onreconnected(
+                    function () {
+
+                        terminal.write(
+                            "\r\n\x1b[32mSignalR reconnected.\x1b[0m\r\n");
+
+                    });
+
+
+                /*
+                 * CLOSE
+                 */
+
+                connection.onclose(
+                    function () {
+
+                        session.connected =
+                            false;
+
+                        session.connecting =
+                            false;
+
+
+                        setServerOnline(
+                            server.id,
+                            false);
+
+
+                        if (activeSessionId ===
+                            sessionId) {
+
+                            updateGlobalStatus(
+                                false,
+                                "Disconnected");
+
+                        }
+
+
+                        terminal.write(
+                            "\r\n\x1b[31mConnection closed.\x1b[0m\r\n");
+
+                    });
+
+
+                /*
+                 * TAB
+                 */
+
+                createTerminalTab(
+                    session);
+
+
+                activateSession(
+                    sessionId);
+
+
+                /*
+                 * FIRST FIT
+                 */
+
+                setTimeout(
+                    function () {
+
+                        try {
+
+                            fitAddon.fit();
+
+                            terminal.focus();
+
+                        }
+                        catch {
+                        }
+
+                    },
+                    100);
+
+
+                /*
+                 * CONNECT
+                 */
+
+                connectSession(
+                    session);
+
+            }
+
+
+            /* =============================================================
+               CONNECT SESSION
+            ============================================================= */
+
+            async function connectSession(
+                session) {
+
+                if (!session)
+                    return;
+
+
+                if (session.connecting)
+                    return;
+
+
+                session.connecting =
+                    true;
+
+
+                const server =
+                    session.server;
+
+
+                const terminal =
+                    session.terminal;
+
+
+                try {
+
+                    terminal.write(
+                        "\x1b[33mConnecting "
+                        + server.host
+                        + ":"
+                        + server.port
+                        + " ...\x1b[0m\r\n");
+
+
+                    if (
+                        session.connection.state ===
+                        signalR.HubConnectionState.Disconnected) {
+
+                        await session.connection.start();
+
+                    }
+
+
+                    /*
+                     * 这里非常重要
+                     *
+                     * SignalR Connected
+                     * 不代表 SSH Connected
+                     *
+                     * 真正 SSH 成功以后
+                     * 后端必须触发 Connected
+                     */
+
+                    await session.connection.invoke(
+                        "ConnectSsh",
+                        {
+
+                            host:
+                                server.host,
+
+                            port:
+                                server.port,
+
+                            username:
+                                server.username,
+
+                            password:
+                                server.password,
+
+                            columns:
+                                120,
+
+                            rows:
+                                30
+
+                        });
+
+
+                }
+                catch (error) {
+
+                    session.connected =
+                        false;
+
+                    session.connecting =
+                        false;
+
+
+                    terminal.write(
+                        "\r\n\x1b[31mConnection failed:\x1b[0m\r\n");
+
+
+                    terminal.write(
+                        String(
+                            error));
+
+
+                    terminal.write(
+                        "\r\n");
+
+
+                    setServerOnline(
+                        server.id,
+                        false);
+
+
+                    if (activeSessionId ===
+                        session.id) {
+
+                        updateGlobalStatus(
+                            false,
+                            "Connection failed");
+
+                    }
+
+                }
+
+            }
+
+
+            /* =============================================================
+               RECONNECT
+            ============================================================= */
+
+            async function reconnectSession(
+                session) {
+
+                if (!session)
+                    return;
+
+
+                session.connected =
+                    false;
+
+
+                await connectSession(
+                    session);
+
+            }
+
+
+            /* =============================================================
+               CREATE TAB
+            ============================================================= */
+
+            function createTerminalTab(
+                session) {
+
+                const tabs =
+                    document.getElementById(
+                        "terminalTabs");
+
+
+                const tab =
+                    document.createElement(
+                        "div");
+
+
+                tab.className =
+                    "terminal-tab";
+
+
+                tab.dataset.session =
+                    session.id;
+
+
+                tab.innerHTML = `
+
+                    <i class="
+                        layui-icon
+                        layui-icon-console
+                        terminal-tab-icon">
+                    </i>
+
+
+                    <span class="terminal-tab-name">
+
+                        ${escapeHtml(session.server.name)}
+
+                    </span>
+
+
+                    <span class="terminal-tab-close"
+                          title="关闭">
+
+                        ×
+
+                    </span>
+
+                `;
+
+
+                tab.onclick =
+                    function () {
+
+                        activateSession(
+                            session.id);
+
+                    };
+
+
+                tab.querySelector(
+                    ".terminal-tab-close")
+                    .onclick =
+                    function (event) {
+
+                        event.stopPropagation();
+
+                        closeSession(
+                            session.id);
+
+                    };
+
+
+                tabs.appendChild(
+                    tab);
+
+            }
+
+
+            /* =============================================================
+               ACTIVATE SESSION
+            ============================================================= */
+
+            function activateSession(
+                sessionId) {
+
+                const session =
+                    sessions[sessionId];
+
+
+                if (!session)
+                    return;
+
+
+                activeSessionId =
+                    sessionId;
+
+
+                document
+                    .querySelectorAll(
+                        ".terminal-instance")
+                    .forEach(
+                        function (item) {
+
+                            item.classList.remove(
+                                "active");
+
+                        });
+
+
+                const terminalElement =
+                    document.getElementById(
+                        "terminal_" +
+                        sessionId);
+
+
+                if (terminalElement) {
+
+                    terminalElement.classList.add(
+                        "active");
+
+                }
+
+
+                document
+                    .querySelectorAll(
+                        ".terminal-tab")
+                    .forEach(
+                        function (tab) {
+
+                            tab.classList.remove(
+                                "active");
+
+
+                            if (
+                                tab.dataset.session ===
+                                sessionId) {
+
+                                tab.classList.add(
+                                    "active");
+
+                            }
+
+                        });
+
+
+                currentServerId =
+                    session.serverId;
+
+
+                selectServer(
+                    session.serverId);
+
+
+                updateGlobalStatus(
+                    session.connected,
+                    session.connected
+                        ? "Connected"
+                        : "Disconnected");
+
+
+                setTimeout(
+                    function () {
+
+                        try {
+
+                            session.fitAddon.fit();
+
+                            session.terminal.focus();
+
+                        }
+                        catch {
+                        }
+
+                    },
+                    30);
+
+            }
+
+
+            /* =============================================================
+               CLOSE SESSION
+            ============================================================= */
+
+            async function closeSession(
+                sessionId) {
+
+                const session =
+                    sessions[sessionId];
+
+
+                if (!session)
+                    return;
+
+
+                session.connected =
+                    false;
+
+
+                try {
+
+                    if (
+                        session.connection.state !==
+                        signalR.HubConnectionState.Disconnected) {
+
+                        await session.connection.stop();
+
+                    }
+
+                }
+                catch {
+                }
+
+
+                const terminalElement =
+                    document.getElementById(
+                        "terminal_" +
+                        sessionId);
+
+
+                if (terminalElement) {
+
+                    terminalElement.remove();
+
+                }
+
+
+                document
+                    .querySelectorAll(
+                        ".terminal-tab")
+                    .forEach(
+                        function (tab) {
+
+                            if (
+                                tab.dataset.session ===
+                                sessionId) {
+
+                                tab.remove();
+
+                            }
+
+                        });
+
+
+                setServerOnline(
+                    session.serverId,
+                    false);
+
+
+                delete sessions[
+                    sessionId];
+
+
+                const remaining =
+                    Object.keys(
+                        sessions);
+
+
+                if (remaining.length > 0) {
+
+                    activateSession(
+                        remaining[
+                        remaining.length - 1
+                        ]);
+
+                }
+                else {
+
+                    activeSessionId =
+                        null;
+
+                    updateGlobalStatus(
+                        false,
+                        "Disconnected");
+
+                    document.getElementById(
+                        "footerUser")
+                        .innerText =
+                        "-";
+
+                    document.getElementById(
+                        "footerAddress")
+                        .innerText =
+                        "-";
+
+                }
+
+            }
+
+
+            /* =============================================================
+               DISCONNECT CURRENT
+            ============================================================= */
+
+            function disconnectCurrentServer() {
+
+                if (!activeSessionId)
+                    return;
+
+
+                closeSession(
+                    activeSessionId);
+
+            }
+
+
+            /* =============================================================
+               CLEAR
+            ============================================================= */
+
+            function clearTerminal() {
+
+                if (!activeSessionId)
+                    return;
+
+
+                const session =
+                    sessions[
+                    activeSessionId];
+
+
+                if (session) {
+
+                    session.terminal.clear();
+
+                }
+
+            }
+
+
+            /* =============================================================
+               SERVER ONLINE
+            ============================================================= */
+
+            function setServerOnline(
+                serverId,
+                online) {
+
+                const element =
+                    document.getElementById(
+                        "serverStatus_" +
+                        serverId);
+
+
+                if (!element)
+                    return;
+
+
+                if (online) {
+
+                    element.classList.add(
+                        "online");
+
+                }
+                else {
+
+                    element.classList.remove(
+                        "online");
+
+                }
+
+            }
+
+
+            /* =============================================================
+               GLOBAL STATUS
+            ============================================================= */
+
+            function updateGlobalStatus(
+                online,
+                text) {
+
+                const dot =
+                    document.getElementById(
+                        "statusDot");
+
+
+                const status =
+                    document.getElementById(
+                        "statusText");
+
+
+                dot.classList.remove(
+                    "connecting",
+                    "online",
+                    "error");
+
+
+                if (online) {
+
+                    dot.classList.add(
+                        "online");
+
+                }
+                else if (
+                    text &&
+                    (
+                        text.includes(
+                            "Connecting") ||
+                        text.includes(
+                            "Reconnecting")
+                    )
+                ) {
+
+                    dot.classList.add(
+                        "connecting");
+
+                }
+                else if (
+                    text === "Error" ||
+                    text === "Connection failed") {
+
+                    dot.classList.add(
+                        "error");
+
+                }
+
+
+                status.innerText =
+                    text;
+
+
+                document.getElementById(
+                    "footerStatus")
+                    .innerText =
+                    text;
+
+            }
+
+
+            /* =============================================================
+               GROUP
+            ============================================================= */
+
+            function toggleGroup(
+                element) {
+
+                const body =
+                    element.nextElementSibling;
+
+
+                const icon =
+                    element.querySelector(
+                        "i");
+
+
+                if (
+                    body.style.display ===
+                    "none") {
+
+                    body.style.display =
+                        "";
+
+
+                    icon.className =
+                        "layui-icon layui-icon-triangle-d";
+
+                }
+                else {
+
+                    body.style.display =
+                        "none";
+
+
+                    icon.className =
+                        "layui-icon layui-icon-triangle-r";
+
+                }
+
+            }
+
+
+            /* =============================================================
+               SEARCH
+            ============================================================= */
+
+            function filterServers() {
+
+                const keyword =
+                    document.getElementById(
+                        "serverSearch")
+                        .value
+                        .toLowerCase();
+
+
+                document
+                    .querySelectorAll(
+                        ".server-item")
+                    .forEach(
+                        function (item) {
+
+                            const text =
+                                item.innerText
+                                    .toLowerCase();
+
+
+                            item.style.display =
+                                text.includes(
+                                    keyword)
+                                    ? ""
+                                    : "none";
+
+                        });
+
+            }
+
+
+            /* =============================================================
+               RECENT SERVER
+            ============================================================= */
+
+            function addRecentServer(
+                serverId) {
+
+                let recent =
+                    JSON.parse(
+                        localStorage.getItem(
+                            "ssh_recent") ||
+                        "[]");
+
+
+                recent =
+                    recent.filter(
+                        x =>
+                            x !== serverId);
+
+
+                recent.unshift(
+                    serverId);
+
+
+                recent =
+                    recent.slice(
+                        0,
+                        10);
+
+
+                localStorage.setItem(
+                    "ssh_recent",
+                    JSON.stringify(
+                        recent));
+
+
+                renderRecentServers();
+
+            }
+
+
+            /* =============================================================
+               RECENT RENDER
+            ============================================================= */
+
+            function renderRecentServers() {
+
+                const container =
+                    document.getElementById(
+                        "recentServers");
+
+
+                if (!container)
+                    return;
+
+
+                container.innerHTML = "";
+
+
+                let recent =
+                    JSON.parse(
+                        localStorage.getItem(
+                            "ssh_recent") ||
+                        "[]");
+
+
+                recent.forEach(
+                    function (id) {
+
+                        const server =
+                            servers.find(
+                                x => x.id === id);
+
+
+                        if (!server)
+                            return;
+
+
+                        const item =
+                            document.createElement(
+                                "div");
+
+
+                        item.className =
+                            "server-item";
+
+
+                        item.dataset.id =
+                            "recent_" +
+                            server.id;
+
+
+                        item.innerHTML = `
+
+                            <div class="server-icon">
+
+                                <i class="
+                                    layui-icon
+                                    layui-icon-time">
+                                </i>
+
+                            </div>
+
+
+                            <div class="server-info">
+
+                                <div class="server-name">
+
+                                    ${escapeHtml(server.name)}
+
+                                </div>
+
+
+                                <div class="server-address">
+
+                                    ${escapeHtml(server.host)}:${server.port}
+
+                                </div>
+
+                            </div>
+
+                        `;
+
+
+                        item.onclick =
+                            function () {
+
+                                selectServer(
+                                    server.id);
+
+                            };
+
+
+                        item.ondblclick =
+                            function () {
+
+                                selectServer(
+                                    server.id);
+
+                                connectCurrentServer();
+
+                            };
+
+
+                        container.appendChild(
+                            item);
+
+                    });
+
+            }
+
+
+            /* =============================================================
+               CONTEXT MENU
+            ============================================================= */
+
+            function showContextMenu(
+                x,
+                y) {
+
+                const menu =
+                    document.getElementById(
+                        "sshContextMenu");
+
+
+                menu.style.display =
+                    "block";
+
+
+                const width =
+                    menu.offsetWidth;
+
+
+                const height =
+                    menu.offsetHeight;
+
+
+                if (
+                    x + width >
+                    window.innerWidth) {
+
+                    x =
+                        window.innerWidth -
+                        width -
+                        5;
+
+                }
+
+
+                if (
+                    y + height >
+                    window.innerHeight) {
+
+                    y =
+                        window.innerHeight -
+                        height -
+                        5;
+
+                }
+
+
+                menu.style.left =
+                    x + "px";
+
+
+                menu.style.top =
+                    y + "px";
+
+            }
+
+
+            function hideContextMenu() {
+
+                document.getElementById(
+                    "sshContextMenu")
+                    .style.display =
+                    "none";
+
+            }
+
+
+            /* =============================================================
+               CONTEXT CONNECT
+            ============================================================= */
+
+            function contextConnect() {
+
+                hideContextMenu();
+
+
+                if (!contextServerId)
+                    return;
+
+
+                selectServer(
+                    contextServerId);
+
+
+                connectCurrentServer();
+
+            }
+
+
+            /* =============================================================
+               CONTEXT NEW TERMINAL
+            ============================================================= */
+
+            function contextNewTerminal() {
+
+                hideContextMenu();
+
+
+                if (!contextServerId)
+                    return;
+
+
+                const server =
+                    servers.find(
+                        x =>
+                            x.id ===
+                            contextServerId);
+
+
+                if (!server)
+                    return;
+
+
+                createSession(
+                    server);
+
+            }
+
+
+            /* =============================================================
+               CONTEXT EDIT
+            ============================================================= */
+
+            function contextEdit() {
+
+                hideContextMenu();
+
+
+                if (!contextServerId)
+                    return;
+
+
+                openEditServer(
+                    contextServerId);
+
+            }
+
+
+            /* =============================================================
+               CONTEXT COPY IP
+            ============================================================= */
+
+            async function contextCopyIp() {
+
+                hideContextMenu();
+
+
+                const server =
+                    servers.find(
+                        x =>
+                            x.id ===
+                            contextServerId);
+
+
+                if (!server)
+                    return;
+
+
+                try {
+
+                    await navigator.clipboard.writeText(
+                        server.host);
+
+                    layer.msg(
+                        "IP 已复制");
+
+                }
+                catch {
+
+                    layer.msg(
+                        "复制失败");
+
+                }
+
+            }
+
+
+            /* =============================================================
+               CONTEXT DELETE
+            ============================================================= */
+
+            function contextDelete() {
+
+                hideContextMenu();
+
+
+                if (!contextServerId)
+                    return;
+
+
+                const server =
+                    servers.find(
+                        x =>
+                            x.id ===
+                            contextServerId);
+
+
+                if (!server)
+                    return;
+
+
+                layer.confirm(
+                    `确定删除服务器「${escapeHtml(server.name)}」？`,
+                    {
+                        title:
+                            "删除 SSH 连接",
+
+                        btn:
+                            [
+                                "删除",
+                                "取消"
+                            ]
+
+                    },
+                    function (index) {
+
+                        /*
+                         * 如果有 Session
+                         */
+
+                        const session =
+                            Object.values(
+                                sessions)
+                                .find(
+                                    x =>
+                                        x.serverId ===
+                                        server.id);
+
+
+                        if (session) {
+
+                            closeSession(
+                                session.id);
+
+                        }
+
+
+                        servers =
+                            servers.filter(
+                                x =>
+                                    x.id !==
+                                    server.id);
+
+
+                        saveServers();
+
+                        renderServers();
+
+                        renderRecentServers();
+
+
+                        if (
+                            currentServerId ===
+                            server.id) {
+
+                            currentServerId =
+                                null;
+
+                        }
+
+
+                        layer.close(
+                            index);
+
+                    });
+
+            }
+
+
+            /* =============================================================
+               RESIZE
+            ============================================================= */
+
+            window.addEventListener(
+                "resize",
+                function () {
+
+                    Object.values(
+                        sessions)
+                        .forEach(
+                            function (session) {
+
+                                try {
+
+                                    session.fitAddon.fit();
+
+                                }
+                                catch {
+                                }
+
+                            });
+
+                });
+
+
+            /* =============================================================
+               ESCAPE
+            ============================================================= */
+
+            function escapeHtml(
+                value) {
+
+                if (
+                    value === null ||
+                    value === undefined) {
+
+                    return "";
+
+                }
+
+
+                return String(value)
+                    .replaceAll(
+                        "&",
+                        "&amp;")
+                    .replaceAll(
+                        "<",
+                        "&lt;")
+                    .replaceAll(
+                        ">",
+                        "&gt;")
+                    .replaceAll(
+                        '"',
+                        "&quot;")
+                    .replaceAll(
+                        "'",
+                        "&#039;");
+            }
+
+
+            function escapeAttr(
+                value) {
+
+                return escapeHtml(
+                    value);
+
+            }
+
+
+            /* =============================================================
+               START
+            ============================================================= */
+
+            renderRecentServers();
+
+    </script>
+
+</body>
+
+</html>
